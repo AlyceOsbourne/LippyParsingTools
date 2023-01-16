@@ -1,4 +1,4 @@
-from components.base import Meta, Pipeline
+from base import Meta, Pipeline
 
 
 class ParserState(metaclass = Meta):
@@ -68,7 +68,6 @@ class Parser(Pipeline):
 
 
 class Sequence(Parser):
-    """This is a parser that will parse a sequence of parsers"""
 
     def __init__(self, *parsers):
         super().__init__(parsers)
@@ -82,7 +81,6 @@ class Sequence(Parser):
 
 
 class Choice(Parser):
-    """This is a parser that will parse a choice of parsers"""
 
     def __init__(self, *parsers):
         super().__init__(parsers)
@@ -96,7 +94,6 @@ class Choice(Parser):
 
 
 class Many(Parser):
-    """This is a parser that will parse a sequence of parsers"""
 
     def __init__(self, parser):
         super().__init__(parser)
@@ -108,7 +105,6 @@ class Many(Parser):
 
 
 class AtLeastOne(Many):
-    """This is a parser that will parse a sequence of parsers"""
 
     def __init__(self, parser):
         super().__init__(parser)
@@ -118,6 +114,41 @@ class AtLeastOne(Many):
         return super().__call__(state)
 
 
+class Optional(Parser):
+
+    def __init__(self, parser):
+        super().__init__(parser)
+
+    def __call__(self, state: ParserState) -> ParserState:
+        state = self.value(state)
+        if state.error_state:
+            return ParserState(state.input, state.pos, state.result, None, False)
+        return state
 
 
+class Not(Parser):
+
+    def __init__(self, parser):
+        super().__init__(parser)
+
+    def __call__(self, state: ParserState) -> ParserState:
+        state = self.value(state)
+        if state.error_state:
+            return ParserState(state.input, state.pos, state.result, None, False)
+        return state.error("not")
+
+
+class And(Parser):
+
+    def __init__(self, parser):
+        super().__init__(parser)
+
+    def __call__(self, state: ParserState) -> ParserState:
+        state = self.value(state)
+        if state.error_state:
+            return state
+        return ParserState(state.input, state.pos, state.result, None, False)
+
+
+__all__ = "ParserState", "Parser", "Sequence", "Choice", "Many", "AtLeastOne", "Optional", "Not", "And"
 

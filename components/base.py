@@ -15,3 +15,6 @@ class Pipeline(metaclass = Meta):
 
     def __rshift__(self, other):
         return self.__call__(other)
+
+
+__all__ = "Pipeline", "Meta"

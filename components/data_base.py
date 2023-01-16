@@ -1,6 +1,6 @@
 from functools import reduce
 
-from components.base import Pipeline
+from base import Pipeline
 
 
 class Monad(Pipeline):
@@ -16,3 +16,6 @@ class Functor(Pipeline):
         if callable(self.value):
             return Monad(self.value(f))
         return Monad(reduce(lambda x, y: y(x), self.value, f))
+
+
+__all__ = "Monad", "Functor"
