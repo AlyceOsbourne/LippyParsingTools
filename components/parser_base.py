@@ -66,6 +66,15 @@ class Parser(Pipeline):
     def __call__(self, state: ParserState) -> ParserState:
         return self.value(state)
 
+    def __or__(self, other):
+        return Choice(self, other)
+
+    def __and__(self, other):
+        return Sequence(self, other)
+
+    def __invert__(self):
+        return Not(self)
+
 
 class Sequence(Parser):
 

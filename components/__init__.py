@@ -1,6 +1,5 @@
 from . import base, data_base
 from .parser_base import *
-
 Text = lambda to_parse: data_base.Monad >> to_parse >> ParserState
 
 
@@ -11,4 +10,5 @@ def parse_text(string, *parsers):
     return prog
 
 
-__all__ = ("base", "data_base", "parser_base", "Program", "parse_program") + parser_base.__all__
+__all__ = ("base", "data_base", "parser_base", "Text", "parse_text") + parser_base.__all__
+
