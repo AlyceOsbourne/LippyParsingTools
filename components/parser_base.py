@@ -65,3 +65,59 @@ class Parser(Pipeline):
 
     def __call__(self, state: ParserState) -> ParserState:
         return self.value(state)
+
+
+class Sequence(Parser):
+    """This is a parser that will parse a sequence of parsers"""
+
+    def __init__(self, *parsers):
+        super().__init__(parsers)
+
+    def __call__(self, state: ParserState) -> ParserState:
+        for p in self.value:
+            state = p(state)
+            if state.error_state:
+                return state
+        return state
+
+
+class Choice(Parser):
+    """This is a parser that will parse a choice of parsers"""
+
+    def __init__(self, *parsers):
+        super().__init__(parsers)
+
+    def __call__(self, state: ParserState) -> ParserState:
+        for p in self.value:
+            state = p(state)
+            if not state.error_state:
+                return state
+        return state
+
+
+class Many(Parser):
+    """This is a parser that will parse a sequence of parsers"""
+
+    def __init__(self, parser):
+        super().__init__(parser)
+
+    def __call__(self, state: ParserState) -> ParserState:
+        while not state.error_state:
+            state = self.value(state)
+        return state
+
+
+class AtLeastOne(Many):
+    """This is a parser that will parse a sequence of parsers"""
+
+    def __init__(self, parser):
+        super().__init__(parser)
+
+    def __call__(self, state: ParserState) -> ParserState:
+        state = self.value(state)
+        return super().__call__(state)
+
+
+
+
+
