@@ -1,4 +1,4 @@
-from base import Meta, Pipeline
+from .base import Meta, Pipeline
 
 
 class ParserState(metaclass = Meta):
@@ -151,4 +151,3 @@ class And(Parser):
 
 
 __all__ = "ParserState", "Parser", "Sequence", "Choice", "Many", "AtLeastOne", "Optional", "Not", "And"
-

@@ -1,6 +1,6 @@
 from functools import reduce
 
-from base import Pipeline
+from .base import Pipeline
 
 
 class Monad(Pipeline):
