@@ -10,5 +10,11 @@ def parse_text(string, *parsers):
     return prog
 
 
+def parse_file(file, *parsers):
+    with open(file, 'r') as f:
+        return parse_text(f.read(), *parsers)
+
+
+
 __all__ = ("base", "data_base", "parser_base", "Text", "parse_text") + parser_base.__all__
 
