@@ -67,7 +67,7 @@ class Parser(Pipeline):
         return self.value(state)
 
     def __or__(self, other):
-        return Choice(self, other)
+        return Or(self, other)
 
     def __and__(self, other):
         return Sequence(self, other)
@@ -89,17 +89,18 @@ class Sequence(Parser):
         return state
 
 
-class Choice(Parser):
+class Or(Parser):
 
     def __init__(self, *parsers):
         super().__init__(parsers)
 
     def __call__(self, state: ParserState) -> ParserState:
-        for p in self.value:
-            state = p(state)
-            if not state.error_state:
-                return state
-        return state
+        while True:
+            for p in self.value:
+                s = p(state)
+                if not s.error_state:
+                    return s
+            return state
 
 
 class Many(Parser):
@@ -159,4 +160,4 @@ class And(Parser):
         return ParserState(state.input, state.pos, state.result, None, False)
 
 
-__all__ = "ParserState", "Parser", "Sequence", "Choice", "Many", "AtLeastOne", "Optional", "Not", "And"
+__all__ = "ParserState", "Parser", "Sequence", "Or", "Many", "AtLeastOne", "Optional", "Not", "And"
