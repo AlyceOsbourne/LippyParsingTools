@@ -100,7 +100,7 @@ class Parser(Pipeline):
         return Not(self)
 
     def __invert__(self):
-        return Many(self)
+        return Optional(self)
 
 
 class Sequence(Parser):
