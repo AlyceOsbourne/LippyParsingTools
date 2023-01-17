@@ -8,13 +8,9 @@ hopefully in a way that resembles the grammars themselves, so its super simple t
 
 from components import *
 
-hello_world_pipe = is_words("Hello", "Goodbye") & Optional(is_whitespace) & Optional(is_word("World")) & Optional(is_eof)
+hello_world_pipe = is_words("Hello", "Goodbye") & Optional(is_whitespace) & is_word("World") & Optional(is_eof)
 
-
-
-Text("HelloWorld") >> hello_world_pipe >> print
-Text("Hello") >> hello_world_pipe >> print
+Text("Hello World") >> hello_world_pipe >> print
 Text("Goodbye World") >> hello_world_pipe >> print
-Text("GoodbyeWorld") >> hello_world_pipe >> print
-
-
+Text("Hello World!") >> hello_world_pipe >> print
+Text("HelloWorld") >> hello_world_pipe >> print

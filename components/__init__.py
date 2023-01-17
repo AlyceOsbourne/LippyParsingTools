@@ -105,6 +105,7 @@ class Special(Enum):
 
     @classmethod
     def make_global(cls, name, **kwargs):
+        # pylint: disable=unresolved-reference
         return global_enum(cls(name, kwargs))
 
     def __str__(self):
@@ -147,11 +148,10 @@ Whitespace = Special.make_global(
     "Whitespace", NEWLINE="\n", SPACE=" ", TAB="\t", RETURN="\r"
 )
 
+
 __all__ = (
-    "base",
-    "data_base",
-    "parser_base",
     "Text",
+    "Special",
     "parse_text",
     "parse_file",
     "is_char",
