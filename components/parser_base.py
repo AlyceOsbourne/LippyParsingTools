@@ -1,3 +1,5 @@
+from functools import cache
+
 from .base import Meta, Pipeline
 
 
@@ -72,8 +74,11 @@ class Parser(Pipeline):
     def __and__(self, other):
         return Sequence(self, other)
 
-    def __invert__(self):
+    def __neg__(self):
         return Not(self)
+
+    def __invert__(self):
+        return Many(self)
 
 
 class Sequence(Parser):
@@ -90,7 +95,7 @@ class Sequence(Parser):
 
 
 class Or(Parser):
-
+    # is supplied by Parser.__or__
     def __init__(self, *parsers):
         super().__init__(parsers)
 
@@ -104,7 +109,7 @@ class Or(Parser):
 
 
 class Many(Parser):
-
+    # is supplied by Parser.__invert__
     def __init__(self, parser):
         super().__init__(parser)
 

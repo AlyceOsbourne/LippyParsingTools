@@ -3,7 +3,7 @@ class Meta(type):
         return self(other)
 
 
-class Pipeline(metaclass = Meta):
+class Pipeline(metaclass=Meta):
     def __init__(self, value):
         self.value = value
 
