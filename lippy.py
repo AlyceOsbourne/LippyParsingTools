@@ -5,18 +5,44 @@ it's intentions are to help me parse out a custom programing language, but is a 
 Once complete will have a fully functional, declarative approach to parsing,
 hopefully in a way that resembles the grammars themselves, so its super simple to use.
 """
-
+from collections import namedtuple
+from pprint import pprint
 from components import *
 
-hello_world_pipe = is_words("Hello", "Goodbye") & Optional(is_whitespace) & is_word("World") & Optional(is_eof)
+Token = namedtuple("Token", ["type", "value"])
 
-Text("Hello World") >> hello_world_pipe >> print
-Text("Goodbye World") >> hello_world_pipe >> print
-Text("Hello World!") >> hello_world_pipe >> print
-Text("HelloWorld") >> hello_world_pipe >> print
+args = Text("a, b, c, d=1, e='2', f=TRUE")
+
+VALUE = REGEX(r"[^,]+") | IDENTIFIER
+
+argument_parser_pipe = Optional(
+    Optional(
+        IDENTIFIER
+        & ASSIGN
+        & VALUE
+        & Many(
+            Optional(WHITESPACE) & COMMA & IDENTIFIER & ASSIGN & VALUE
+        )
+    )
+    & Optional(VALUE & Many(Optional(WHITESPACE) & COMMA & VALUE))
+)
 
 
-# regex match for comma separated values, with optianal whitespace around the commas
-csv_pipe = is_regex(r"([a-zA-Z0-9]+,? ?)+") & Optional(is_eof)
+transform_args_to_tok = Parser(
+    lambda parser_state: ParserState(
+        parser_state.input,
+        parser_state.pos,
+        [
+            Token(
+                    "arg" if (s:=len(res.strip())) == 1 else "Kwarg", res.strip() if s == 1 else res.strip().split("="))
+            for res in parser_state.result
+            if res != ","
+        ],
+        parser_state.error_message,
+        parser_state.error_state,
+    )
+)
 
-Text("Hello, World, This, Is, A, Test") >> csv_pipe >> print
+
+res = args >> argument_parser_pipe >> transform_args_to_tok
+pprint(res.value.result)

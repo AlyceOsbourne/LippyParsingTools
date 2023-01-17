@@ -1,31 +1,37 @@
+import re
 from functools import cache
 
 from .base import Meta, Pipeline
 
 
+class ParserException(Exception):
+    pass
+
+
 class ParserState(metaclass = Meta):
     """This contains the state of the parser"""
 
-    def __init__(self,
-                 to_parse: str,
-                 pos: int = 0,
-                 result: str = "",
-                 error_message: str = None,
-                 error_state: bool = False):
+    def __init__(
+            self,
+            to_parse: str,
+            pos: int = 0,
+            result: list = None,
+            error_message: str = None,
+            error_state: bool = False,
+    ):
         self.input = to_parse
         self.pos = pos
-        self.result = result
+        self.result = result or []
         self.error_message = error_message
         self.error_state = error_state
-
-    def __str__(self):
-        return f"ParserState(input={self.input}, pos={self.pos}, result={self.result}, error={self.error_message}, is_error={self.error_state})"
 
     def is_eof(self):
         return self.pos >= len(self.input) or self.input[self.pos] is None
 
-    def bind(self, f):
-        return ParserState(self.input, self.pos, f(self.result), self.error_message, self.error_state)
+    def map(self, f):
+        return ParserState(
+                self.input, self.pos, f(self.result), self.error_message, self.error_state
+        )
 
     def is_(self, f):
         if not callable(f):
@@ -49,19 +55,29 @@ class ParserState(metaclass = Meta):
         if self.error_state:
             return self
         try:
-            return ParserState(self.input, self.pos, self.result + s, self.error_message, self.error_state)
+            return ParserState(
+                    self.input,
+                    self.pos,
+                    self.result + [s],
+                    self.error_message,
+                    self.error_state,
+            )
         except:
-            return ParserState(self.input, self.pos, self.result, self.error_message, True)
+            return ParserState(
+                    self.input, self.pos, self.result, self.error_message, True
+            )
+
+    def append_and_shift(self, s, i):
+        return self.append(s).shift(i)
 
     def error(self, msg):
         return ParserState(self.input, self.pos, self.result, msg, True)
 
-    def bind_and_shift(self, f, i):
-        return self.bind(f).shift(i)
+    def __repr__(self):
+        return f"ParserState(input={self.input!r}, pos={self.pos!r}, result={self.result!r}, error={self.error_message!r}, is_error={self.error_state!r})"
 
 
 class Parser(Pipeline):
-
     def __str__(self):
         return f"Parser({self.value})"
 
@@ -74,6 +90,12 @@ class Parser(Pipeline):
     def __and__(self, other):
         return Sequence(self, other)
 
+    def __mul__(self, other):
+        return Many(other)
+
+    def __floordiv__(self, other):
+        return Optional(other)
+
     def __neg__(self):
         return Not(self)
 
@@ -82,7 +104,6 @@ class Parser(Pipeline):
 
 
 class Sequence(Parser):
-
     def __init__(self, *parsers):
         super().__init__(parsers)
 
@@ -109,9 +130,6 @@ class Or(Parser):
 
 
 class Many(Parser):
-    # is supplied by Parser.__invert__
-    def __init__(self, parser):
-        super().__init__(parser)
 
     def __call__(self, state: ParserState) -> ParserState:
         while not state.error_state:
@@ -121,18 +139,12 @@ class Many(Parser):
 
 class AtLeastOne(Many):
 
-    def __init__(self, parser):
-        super().__init__(parser)
-
     def __call__(self, state: ParserState) -> ParserState:
         state = self.value(state)
         return super().__call__(state)
 
 
 class Optional(Parser):
-
-    def __init__(self, parser):
-        super().__init__(parser)
 
     def __call__(self, state: ParserState) -> ParserState:
         state = self.value(state)
@@ -143,9 +155,6 @@ class Optional(Parser):
 
 class Not(Parser):
 
-    def __init__(self, parser):
-        super().__init__(parser)
-
     def __call__(self, state: ParserState) -> ParserState:
         state = self.value(state)
         if state.error_state:
@@ -155,9 +164,6 @@ class Not(Parser):
 
 class And(Parser):
 
-    def __init__(self, parser):
-        super().__init__(parser)
-
     def __call__(self, state: ParserState) -> ParserState:
         state = self.value(state)
         if state.error_state:
@@ -165,4 +171,29 @@ class And(Parser):
         return ParserState(state.input, state.pos, state.result, None, False)
 
 
-__all__ = "ParserState", "Parser", "Sequence", "Or", "Many", "AtLeastOne", "Optional", "Not", "And"
+class Regex(Parser):
+
+    def __call__(self, state: ParserState) -> ParserState:
+        match = self.value(state)
+        if match.error_state:
+            return match
+        pattern = match.result
+        match = re.match(pattern, state.input[match.pos:])
+        if match:
+            return state.append_and_shift(match.group(), len(match.group()))
+        else:
+            return state.error(f"Expected regex pattern {pattern}")
+
+
+__all__ = (
+        "ParserException",
+        "ParserState",
+        "Parser",
+        "Sequence",
+        "Or",
+        "Many",
+        "AtLeastOne",
+        "Optional",
+        "Not",
+        "And",
+)
