@@ -14,3 +14,9 @@ Text("Hello World") >> hello_world_pipe >> print
 Text("Goodbye World") >> hello_world_pipe >> print
 Text("Hello World!") >> hello_world_pipe >> print
 Text("HelloWorld") >> hello_world_pipe >> print
+
+
+# regex match for comma separated values, with optianal whitespace around the commas
+csv_pipe = is_regex(r"([a-zA-Z0-9]+,? ?)+") & Optional(is_eof)
+
+Text("Hello, World, This, Is, A, Test") >> csv_pipe >> print

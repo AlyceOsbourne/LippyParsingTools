@@ -2,6 +2,7 @@ from enum import Enum, global_enum
 
 from . import base, data_base
 from .parser_base import *
+import re
 
 Text = lambda to_parse: data_base.Monad >> to_parse >> ParserState
 
@@ -42,21 +43,32 @@ def is_chars(*chars):
 def is_word(word):
     def _is_word(state: ParserState):
         if state.pos + len(word) <= len(state.input):
-            if state.input[state.pos : state.pos + len(word)] == word:
+            if state.input[state.pos: state.pos + len(word)] == word:
                 return state.append(word).shift(len(word))
             return state.error(f"Expected {word} but got {state.input[state.pos]}")
         return state.error(f"Expected {word} but got EOF")
+
     return Parser(_is_word)
 
 
 def is_words(*words):
     def _is_choice_words(state: ParserState):
         for word in words:
-            if state.input[state.pos : state.pos + len(word)] == word:
+            if state.input[state.pos: state.pos + len(word)] == word:
                 return state.append(word).shift(len(word))
         return state.error(f"Expected one of {words} but got {state.input[state.pos]}")
 
     return Parser(_is_choice_words)
+
+
+def is_regex(regex_pattern_str):
+    def _is_regex(state: ParserState):
+        match = re.match(regex_pattern_str, state.input[state.pos:])
+        if match:
+            return state.append(match.group(0)).shift(len(match.group(0)))
+        return state.error(f"Expected {regex_pattern_str} but got {state.input[state.pos]}")
+
+    return Parser(_is_regex)
 
 
 @Parser
@@ -71,7 +83,7 @@ def is_any_word(state: ParserState):
     start = state.pos
     while not state.is_eof() and state.input[state.pos] not in " \t\r\n":
         state = state.shift(1)
-    return state.append(state.input[start : state.pos])
+    return state.append(state.input[start: state.pos])
 
 
 @Parser
@@ -116,56 +128,56 @@ class Special(Enum):
 
 
 Operators = Special.make_global(
-    "Operators",
-    ADD="+",
-    SUB="-",
-    MUL="*",
-    DIV="/",
-    MOD="%",
-    POW="^",
-    EQ="==",
-    NEQ="!=",
-    LT="<",
-    GT=">",
-    LTE="<=",
-    GTE=">=",
+        "Operators",
+        ADD = "+",
+        SUB = "-",
+        MUL = "*",
+        DIV = "/",
+        MOD = "%",
+        POW = "^",
+        EQ = "==",
+        NEQ = "!=",
+        LT = "<",
+        GT = ">",
+        LTE = "<=",
+        GTE = ">=",
 )
 
 Brackets = Special.make_global(
-    "Brackets",
-    LPAREN="(",
-    RPAREN=")",
-    LBRACE="{",
-    RBRACE="}",
-    LBRACKET="[",
-    RBRACKET="]",
+        "Brackets",
+        LPAREN = "(",
+        RPAREN = ")",
+        LBRACE = "{",
+        RBRACE = "}",
+        LBRACKET = "[",
+        RBRACKET = "]",
 )
 
 Punctuation = Special.make_global(
-    "Punctuation", COMMA=",", COLON=":", SEMICOLON=";", DOT="."
+        "Punctuation", COMMA = ",", COLON = ":", SEMICOLON = ";", DOT = "."
 )
 Whitespace = Special.make_global(
-    "Whitespace", NEWLINE="\n", SPACE=" ", TAB="\t", RETURN="\r"
+        "Whitespace", NEWLINE = "\n", SPACE = " ", TAB = "\t", RETURN = "\r"
 )
 
-
 __all__ = (
-    "Text",
-    "Special",
-    "parse_text",
-    "parse_file",
-    "is_char",
-    "is_chars",
-    "is_any_char",
-    "is_word",
-    "is_words",
-    "is_any_word",
-    "is_eof",
-    "is_number",
-    "is_whitespace",
-    *parser_base.__all__,
-    *Operators.__members__.keys(),
-    *Brackets.__members__.keys(),
-    *Punctuation.__members__.keys(),
-    *Whitespace.__members__.keys(),
+        "Text",
+        "Special",
+        "parse_text",
+        "parse_file",
+        "is_char",
+        "is_chars",
+        "is_any_char",
+        "is_word",
+        "is_words",
+        "is_any_word",
+        "is_regex",
+        "is_eof",
+        "is_number",
+        "is_whitespace",
+        *parser_base.__all__,
+        *Operators.__members__.keys(),
+        *Brackets.__members__.keys(),
+        *Punctuation.__members__.keys(),
+        *Whitespace.__members__.keys(),
 )
