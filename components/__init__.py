@@ -1,10 +1,10 @@
-from enum import Enum, global_enum
+from collections import namedtuple
 
-from . import base, data_base
-from .parser_base import *
-import re
+from components import pipeline_meta
+from components.parsers import *
 
-Text = lambda to_parse: data_base.Monad >> to_parse >> ParserState
+Text = lambda to_parse: pipeline_meta.Monad >> to_parse >> ParserState
+Token = namedtuple("Token", ["type", "value"])
 
 
 def parse_text(string, *parsers):
@@ -19,75 +19,6 @@ def parse_file(file, *parsers):
         return parse_text(f.read(), *parsers)
 
 
-def CHAR(char):
-    def _is_char(state: ParserState):
-        # in range
-        if state.pos < len(state.input):
-            if state.is_(lambda x: x == char):
-                return state.append(char).shift(1)
-            return state.error(f"Expected {char} but got {state.input[state.pos]}")
-        return state.error(f"Expected {char} but got EOF")
-
-    return Parser(_is_char)
-
-
-def CHARS(*chars):
-    def _is_choice_chars(state: ParserState):
-        if state.is_(lambda x: x in chars):
-            return state.append(state.input[state.pos]).shift(1)
-        return state.error(f"Expected one of {chars} but got {state.input[state.pos]}")
-
-    return Parser(_is_choice_chars)
-
-
-def WORD(word):
-    def _is_word(state: ParserState):
-        if state.pos + len(word) <= len(state.input):
-            if state.input[state.pos: state.pos + len(word)] == word:
-                return state.append(word).shift(len(word))
-            return state.error(f"Expected {word} but got {state.input[state.pos]}")
-        return state.error(f"Expected {word} but got EOF")
-
-    return Parser(_is_word)
-
-
-def WORDS(*words):
-    def _is_choice_words(state: ParserState):
-        for word in words:
-            if state.input[state.pos: state.pos + len(word)] == word:
-                return state.append(word).shift(len(word))
-        return state.error(f"Expected one of {words} but got {state.input[state.pos]}")
-
-    return Parser(_is_choice_words)
-
-
-def REGEX(regex_pattern_str):
-    def _is_regex(state: ParserState):
-        if state.pos < len(state.input):
-            match = re.match(regex_pattern_str, state.input[state.pos:])
-            if match:
-                return state.append(match.group(0)).shift(len(match.group(0)))
-            return state.error(f"Expected {regex_pattern_str} but got {state.input[state.pos]}")
-        return state.error(f"Expected {regex_pattern_str} but got EOF")
-
-    return Parser(_is_regex)
-
-
-@Parser
-def ANY_CHAR(state: ParserState):
-    if not state.is_eof():
-        return state.append(state.input[state.pos]).shift(1)
-    return state.error(f"Expected any char but got EOF")
-
-
-@Parser
-def ANY_WORD(state: ParserState):
-    start = state.pos
-    while not state.is_eof() and state.input[state.pos] not in " \t\r\n":
-        state = state.shift(1)
-    return state.append(state.input[start: state.pos])
-
-
 @Parser
 def EOF(state: ParserState):
     if state.pos < len(state.input):
@@ -96,91 +27,236 @@ def EOF(state: ParserState):
 
 
 @Parser
-def NUMBER(state: ParserState):
-    # uses regex to parse a float or int
-    if state.pos < len(state.input):
-        match = re.match(r"(-?\d+(?:\.\d+)?)", state.input[state.pos:])
+def EOL(state: ParserState):
+    if state.pos < len(state.input) and state.input[state.pos] != "\n":
+        return state.error(f"Expected EOL but got {state.input[state.pos]}")
+    return state
+
+
+@Parser
+def Whitespace(state: ParserState):
+    if state.pos < len(state.input) and state.input[state.pos] in " \t":
+        return state.shift(1)
+    return state
+
+
+def Terminal(pattern, token_type=None):
+    def regex(state: ParserState):
+        match = re.match(pattern, state.input[state.pos :], re.MULTILINE)
         if match:
-            return state.append_and_shift(match.group(0), len(match.group(0)))
-        return state.error(f"Expected number but got {state.input[state.pos]}")
-    return state.error(f"Expected number but got EOF")
+            if token_type:
+                return state.append_and_shift(
+                    Token(token_type, match.group()), len(match.group())
+                )
+            return state.append_and_shift(match.group(), len(match.group()))
+        else:
+            return state.error(f"Expected regex pattern {pattern}")
+
+    return Parser(regex)
 
 
-class SpecialWord(Enum):
-    def __new__(cls, value):
-        obj = object.__new__(cls)
-        obj._value_ = Parser(CHAR(value) if len(value) == 1 else WORD(value))
-        return obj
+Regex = Terminal
 
-    @classmethod
-    def make_global(cls, name, **kwargs):
-        # pylint: disable=unresolved-reference
-        return global_enum(cls(name, kwargs))
+Identifier = Terminal(r"[a-zA-Z_][a-zA-Z0-9_]*", "identifier")
+Integer = Terminal(r"[0-9]+", "integer")
+Float = Terminal(r"[0-9]+\.[0-9]+", "float")
+Binary = Terminal(r"0b[01]+", "binary")
+Octal = Terminal(r"0o[0-7]+", "octal")
+Hex = Terminal(r"0x[0-9a-fA-F]+", "hex")
+Expontential = Terminal(r"[0-9]+e[0-9]+", "exponential")
+Number = Integer | Float | Binary | Octal | Hex | Expontential
+String = Terminal(r'"[^"]*"', "string")
+Boolean = Terminal(r"true|false", "boolean")
+Literal = Number | String | Boolean
 
-    def __str__(self):
-        return f"SpecialWord.{self.name}"
+# brackets
+LParen = Terminal(r"\(", "lparen")
+RParen = Terminal(r"\)", "rparen")
+LBracket = Terminal(r"\[", "lbracket")
+RBracket = Terminal(r"\]", "rbracket")
+LBrace = Terminal(r"\{", "lbrace")
+RBrace = Terminal(r"\}", "rbrace")
 
-    def __call__(self, state: ParserState):
-        return self.value(state)
+# operators
+Plus = Terminal(r"\+", "plus")
+Minus = Terminal(r"-", "minus")
+Multiply = Terminal(r"\*", "multiply")
+Divide = Terminal(r"/", "divide")
+Modulo = Terminal(r"%", "modulo")
+Exponent = Terminal(r"\*\*", "exponent")
+Equals = Terminal(r"=", "equals")
+NotEquals = Terminal(r"!=", "not_equals")
+LessThan = Terminal(r"<", "less_than")
+GreaterThan = Terminal(r">", "greater_than")
+LessThanEquals = Terminal(r"<=", "less_than_equals")
+GreaterThanEquals = Terminal(r">=", "greater_than_equals")
+And = Terminal(r"&&", "and")
+Or = Terminal(r"\|\|", "or")
+Not = Terminal(r"!", "not")
+Dot = Terminal(r"\.", "dot")
+Comma = Terminal(r",", "comma")
+Semicolon = Terminal(r";", "semicolon")
+Colon = Terminal(r":", "colon")
+Arrow = Terminal(r"->", "arrow")
+At = Terminal(r"@", "at")
+Hash = Terminal(r"#", "hash")
+Dollar = Terminal(r"\$", "dollar")
+Ampersand = Terminal(r"&", "ampersand")
+Pipe = Terminal(r"\|", "pipe")
+Tilde = Terminal(r"~", "tilde")
+Caret = Terminal(r"\^", "caret")
+Backtick = Terminal(r"`", "backtick")
+QuestionMark = Terminal(r"\?", "question_mark")
+Underscore = Terminal(r"_", "underscore")
+Backslash = Terminal(r"\\", "backslash")
+Slash = Terminal(r"/", "slash")
+SingleQuote = Terminal(r"'", "single_quote")
+DoubleQuote = Terminal(r'"', "double_quote")
+Assign = Terminal(r":=", "assign")
+PlusEquals = Terminal(r"\+=", "plus_equals")
+MinusEquals = Terminal(r"-=", "minus_equals")
+MultiplyEquals = Terminal(r"\*=", "multiply_equals")
+DivideEquals = Terminal(r"/=", "divide_equals")
+ModuloEquals = Terminal(r"%=", "modulo_equals")
+ExponentEquals = Terminal(r"\*\*=", "exponent_equals")
+AndEquals = Terminal(r"&=", "and_equals")
+OrEquals = Terminal(r"\|=", "or_equals")
+XorEquals = Terminal(r"\^=", "xor_equals")
+ShiftLeft = Terminal(r"<<", "shift_left")
+ShiftRight = Terminal(r">>", "shift_right")
+ShiftLeftEquals = Terminal(r"<<=", "shift_left_equals")
+ShiftRightEquals = Terminal(r">>=", "shift_right_equals")
 
-
-Operators = SpecialWord.make_global(
-        "Operators",
-        ASSIGN = "=",
-        ADD = "+",
-        SUB = "-",
-        MUL = "*",
-        DIV = "/",
-        MOD = "%",
-        POW = "^",
-        EQ = "==",
-        NEQ = "!=",
-        LT = "<",
-        GT = ">",
-        LTE = "<=",
-        GTE = ">=",
+UnaryOperators = Not | Plus | Minus | Tilde
+BinaryOperators = (
+    Plus
+    | Minus
+    | Multiply
+    | Divide
+    | Modulo
+    | Exponent
+    | Equals
+    | NotEquals
+    | LessThan
+    | GreaterThan
+    | LessThanEquals
+    | GreaterThanEquals
+    | And
+    | Or
+    | Dot
+    | Comma
+    | Semicolon
+    | Colon
+    | Arrow
+    | At
+    | Hash
+    | Dollar
+    | Ampersand
+    | Pipe
+    | Tilde
+    | Caret
+    | Backtick
+    | QuestionMark
+    | Underscore
+    | Backslash
+    | Slash
+    | SingleQuote
+    | DoubleQuote
+    | Assign
+    | PlusEquals
+    | MinusEquals
+    | MultiplyEquals
+    | DivideEquals
+    | ModuloEquals
+    | ExponentEquals
+    | AndEquals
+    | OrEquals
+    | XorEquals
+    | ShiftLeft
+    | ShiftRight
+    | ShiftLeftEquals
+    | ShiftRightEquals
 )
 
-Brackets = SpecialWord.make_global(
-        "Brackets",
-        LPAREN = "(",
-        RPAREN = ")",
-        LBRACE = "{",
-        RBRACE = "}",
-        LBRACKET = "[",
-        RBRACKET = "]",
+BinOp = Literal + ~Whitespace + BinaryOperators + ~Whitespace + Literal
+BinOp = BinOp | (LParen + BinOp + RParen)
+UnaryOp = UnaryOperators + ~Whitespace + BinOp
+UnaryOp = UnaryOp | (LParen + UnaryOp + RParen)
+Expr = BinOp | UnaryOp
+Expr = Expr | (LParen + Expr + RParen)
+Expr = Expr | Literal | Identifier
+
+# Flow control
+If = Terminal(r"if", "if")
+Else = Terminal(r"else", "else")
+For = Terminal(r"for", "for")
+While = Terminal(r"while", "while")
+Do = Terminal(r"do", "do")
+In = Terminal(r"in", "in")
+Return = Terminal(r"return", "return")
+Break = Terminal(r"break", "break")
+Continue = Terminal(r"continue", "continue")
+
+# Types
+Int = Terminal(r"int", "int")
+Float = Terminal(r"float", "float")
+String = Terminal(r"string", "string")
+Boolean = Terminal(r"boolean", "boolean")
+Void = Terminal(r"void", "void")
+Type = Int | Float | String | Boolean | Void
+
+
+# Comments
+LineComment = Terminal(r"//.*", "line_comment")
+BlockComment = Terminal(r"/\*.*\*/", "block_comment")
+Comment = LineComment | BlockComment
+
+# Containers
+CommeSeparatedExpr = Expr + +(Comma + Expr)
+CommaSeperateKeyExprPairs = (Identifier + Colon + Expr) + +(
+    Comma + Identifier + Colon + Expr
+)
+List = LBracket + ~CommeSeparatedExpr + RBracket
+Tuple = LParen + ~CommeSeparatedExpr + RParen
+Set = LBrace + ~CommeSeparatedExpr + RBrace
+Dict = LBrace + ~CommaSeperateKeyExprPairs + RBrace
+Container = List | Tuple | Set | Dict
+
+# Parameters
+Arg = Identifier + ~(Colon + (Type | Identifier))
+Kwarg = Arg + Equals + Expr
+Args = Arg + +(Comma + Arg)
+Kwargs = Kwarg + +(Comma + Kwarg)
+Parameters = ~Args + ~Kwargs
+Arguments = ~CommeSeparatedExpr + ~Kwargs
+
+# Keywords
+Keyword = (
+    If
+    | Else
+    | For
+    | While
+    | Do
+    | In
+    | Return
+    | Break
+    | Continue
+    | Int
+    | Float
+    | String
+    | Boolean
+    | Void
 )
 
-Punctuation = SpecialWord.make_global(
-        "Punctuation", COMMA = ",", COLON = ":", SEMICOLON = ";", DOT = "."
+# Literals
+Literal = (
+    Number
+    | String
+    | Boolean
+    | List
+    | Tuple
+    | Set
+    | Dict
+    | Identifier
 )
 
-Other = SpecialWord.make_global(
-        "Whitespace", NEWLINE = "\n", SPACE = " ", TAB = "\t", RETURN = "\r", WHITESPACE = " \t\r\n"
-)
-
-
-IDENTIFIER = REGEX(r"[a-zA-Z_][a-zA-Z0-9_]+")
-
-
-__all__ = (
-        "Text",
-        "SpecialWord",
-        "parse_text",
-        "parse_file",
-        "CHAR",
-        "CHARS",
-        "ANY_CHAR",
-        "WORD",
-        "WORDS",
-        "ANY_WORD",
-        "REGEX",
-        "EOF",
-        "NUMBER",
-        "IDENTIFIER",
-        *parser_base.__all__,
-        *Operators.__members__.keys(),
-        *Brackets.__members__.keys(),
-        *Punctuation.__members__.keys(),
-        *Other.__members__.keys(),
-)
