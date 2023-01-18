@@ -11,4 +11,4 @@ from components import *
 
 
 
-Text("(1 + 2) * 3") >> Expr >> print
+Text("if") >> Expr >> print
