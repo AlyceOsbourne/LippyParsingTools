@@ -5,10 +5,5 @@ it's intentions are to help me parse out a custom programing language, but is a 
 Once complete will have a fully functional, declarative approach to parsing,
 hopefully in a way that resembles the grammars themselves, so its super simple to use.
 """
-from collections import namedtuple
-from pprint import pprint
 from components import *
 
-
-
-Text("if") >> Expr >> print

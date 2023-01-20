@@ -76,6 +76,9 @@ class ParserState(metaclass = Meta):
     def __repr__(self):
         return f"ParserState(input={self.input!r}, pos={self.pos!r}, result={self.result!r}, error={self.error_message!r}, is_error={self.error_state!r})"
 
+    def __str__(self):
+        return " ".join(map(str, self.result))
+
 
 class Parser(Pipeline):
     def __str__(self):
@@ -86,6 +89,7 @@ class Parser(Pipeline):
 
     def __or__(self, *other):
         """This parser or that parser, if this parser fails, try that parser"""
+
         def parser(state: ParserState):
             result = self(state)
             if not result.error_state:
@@ -95,19 +99,23 @@ class Parser(Pipeline):
                 if not result.error_state:
                     return result
             return result.error(f"Expected {self} or {other}")
+
         return Parser(parser)
 
     def __add__(self, other):
         """This parser and that parser, if this parser fails, don't try that parser"""
+
         def parser(state: ParserState):
             result = self(state)
             if result.error_state:
                 return result
             return other(result)
+
         return Parser(parser)
 
     def __pos__(self):
         """Many of this parser"""
+
         def parser(state: ParserState):
             result = self(state)
             if result.error_state:
@@ -115,22 +123,38 @@ class Parser(Pipeline):
             while not result.error_state:
                 result = self(result)
             return result
+
         return Parser(parser)
 
     def __neg__(self):
         """Not this parser"""
+
         def parser(state: ParserState):
             result = self(state)
             if result.error_state:
                 return state
             return result.error(f"Expected not {self}")
+
         return Parser(parser)
 
     def __invert__(self):
         """Optional this parser"""
+
         def parser(state: ParserState):
             result = self(state)
             if result.error_state:
                 return state
             return result
+
+        return Parser(parser)
+
+    def __and__(self, other):
+        """Sequence this parser and that parser"""
+
+        def parser(state: ParserState):
+            result = self(state)
+            if result.error_state:
+                return result
+            return other(result)
+
         return Parser(parser)
