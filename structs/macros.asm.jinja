@@ -1,0 +1,7 @@
+{% block macros %}
+%macro print 1
+        push    %1
+        call    _printf
+        add     esp, 4
+%endmacro
+{% endblock macros %}

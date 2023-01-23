@@ -1,14 +1,6 @@
 import re
-from collections import namedtuple
 
 from components import Parser, ParserState, pipeline_meta
-
-
-class Token(namedtuple("Token", ["type", "value"])):
-    ...
-
-
-Text = lambda to_parse: pipeline_meta.Monad >> to_parse >> ParserState
 
 
 def parse_text(string, *parsers):
@@ -21,6 +13,25 @@ def parse_text(string, *parsers):
 def parse_file(file, *parsers):
     with open(file, "r") as f:
         return parse_text(f.read(), *parsers)
+
+
+class Token:
+
+    def __str__(self):
+        return f"{self.type}({' '.join(map(str, self.value))})"
+
+    def __repr__(self):
+        return f"Token({self.type!r}, {self.value!r})"
+
+    def __eq__(self, other):
+        return self.type == other.type and self.value == other.value
+
+    def __hash__(self):
+        return hash((self.type, self.value))
+
+    def __init__(self, _type, value = ""):
+        self.type = _type
+        self.value = value
 
 
 @Parser
@@ -70,7 +81,13 @@ def Tokenize(token_type):
     return Parser(tokenize)
 
 
-Terminal = lambda pattern, token_type: Regex(pattern) + Tokenize(token_type)
+def Text(to_parse):
+    return pipeline_meta.Monad >> to_parse >> ParserState
+
+
+def Terminal(pattern, token_type):
+    return Regex(pattern) + Tokenize(token_type)
+
 
 # Literals
 Identifier = Terminal(r"[a-zA-Z_][a-zA-Z0-9_]*", "IDENTIFIER")
@@ -79,7 +96,7 @@ Integer = Terminal(r"[0-9]+", "INTEGER")
 Number = (Float | Integer) + Tokenize("NUMBER")
 String = Terminal(r'"[^"]*"|\'[^\']*\'', "STRING")
 Boolean = Terminal(r"true|false", "BOOLEAN")
-Literal = (Number | String | Boolean | Identifier)
+Literal = Number | String | Boolean | Identifier
 
 # brackets
 LParen = Terminal(r"\(", "LPAREN")
@@ -199,56 +216,49 @@ Return = Terminal(r"return", "RETURN")
 Break = Terminal(r"break", "BREAK")
 Continue = Terminal(r"continue", "CONTINUE")
 
-FlowControl = (
-        If
-        | Else
-        | For
-        | While
-        | Do
-        | In
-        | Return
-        | Break
-        | Continue
-)
+FlowControl = If | Else | For | While | Do | In | Return | Break | Continue
 
 if __name__ == "__main__":
     # test literals
-    Text('X') >> Literal >> print
-    Text('123') >> Literal >> print
-    Text('123.456') >> Literal >> print
+    Text("X") >> Literal >> print
+    Text("123") >> Literal >> print
+    Text("123.456") >> Literal >> print
     Text('"hello"') >> Literal >> print
-    Text('true') >> Literal >> print
-    Text('false') >> Literal >> print
+    Text("true") >> Literal >> print
+    Text("false") >> Literal >> print
 
     # test operators
-    Text('+') >> Operator >> print
-    Text('+=') >> Operator >> print
-    Text('**=') >> Operator >> print
-    Text('>>=') >> Operator >> print
+    Text("+") >> Operator >> print
+    Text("+=") >> Operator >> print
+    Text("**=") >> Operator >> print
+    Text(">>=") >> Operator >> print
 
     # test flow control
-    Text('if') >> FlowControl >> print
-    Text('else') >> FlowControl >> print
-    Text('for') >> FlowControl >> print
-    Text('while') >> FlowControl >> print
-    Text('do') >> FlowControl >> print
-    Text('in') >> FlowControl >> print
-    Text('return') >> FlowControl >> print
+    Text("if") >> FlowControl >> print
+    Text("else") >> FlowControl >> print
+    Text("for") >> FlowControl >> print
+    Text("while") >> FlowControl >> print
+    Text("do") >> FlowControl >> print
+    Text("in") >> FlowControl >> print
+    Text("return") >> FlowControl >> print
 
     # test identifiers
-    Text('x') >> Identifier >> print
-    Text('x123') >> Identifier >> print
-    Text('x_123') >> Identifier >> print
-    Text('x_123_') >> Identifier >> print
-    Text('x_123_abc') >> Identifier >> print
+    Text("x") >> Identifier >> print
+    Text("x123") >> Identifier >> print
+    Text("x_123") >> Identifier >> print
+    Text("x_123_") >> Identifier >> print
+    Text("x_123_abc") >> Identifier >> print
 
     # basic assignment statement
     Assignment = (
-                         Identifier
-                         + ~Whitespace
-                         + Assign
-                         + ~Whitespace
-                         + Literal
-                         + ~Whitespace
-                         + Semicolon
-                 ) + Tokenize("ASSIGNMENT")
+                         Identifier  # must start with an identifier
+                         + ~Whitespace  # followed by optional whitespace
+                         + Assign  # followed by an assignment operator
+                         + ~Whitespace  # followed by optional whitespace
+                         + Literal  # followed by a literal
+                         + ~Whitespace  # followed by optional whitespace
+                         + Semicolon  # followed by a semicolon
+                 ) + Tokenize("ASSIGNMENT")  # and tokenized as an assignment statement
+
+    Text("x = 123;") >> Assignment >> print
+    # >> are pipelines, they push the value from this parser to the next, this works cause of monoids

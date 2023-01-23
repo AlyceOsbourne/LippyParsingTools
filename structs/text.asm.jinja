@@ -1,0 +1,12 @@
+{% block text %}
+section .text
+    global _main
+    _main:
+        {% block main %}
+        print lippy_version
+        {% block code %}
+        {% endblock %}
+        mov eax, {{ exit_code or 0 }}
+        ret
+        {% endblock main %}
+{% endblock text %}

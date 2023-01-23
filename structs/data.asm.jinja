@@ -1,0 +1,6 @@
+{% block data %}
+section .data
+    {% for var in variables %}
+    {{var.name}} {{var.type}} {{var.value}}
+    {% endfor %}
+{% endblock %}

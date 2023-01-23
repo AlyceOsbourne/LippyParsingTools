@@ -110,7 +110,6 @@ class Parser(Pipeline):
             if result.error_state:
                 return result
             return other(result)
-
         return Parser(parser)
 
     def __pos__(self):

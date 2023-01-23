@@ -1,4 +1,4 @@
-from functools import cache, reduce
+from functools import reduce
 
 
 class Meta(type):
